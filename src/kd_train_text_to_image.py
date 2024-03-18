@@ -57,7 +57,7 @@ import wandb
 has_wandb = True
 
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
-check_min_version("0.15.0")
+check_min_version("0.27.0")
 
 logger = get_logger(__name__, log_level="INFO")
 
