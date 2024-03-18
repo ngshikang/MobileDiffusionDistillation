@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#PBS -N MobileDiffusionRun
+#PBS -N DistillationOriginal
 #PBS -q normal
 #PBS -l select=1:ncpus=2:mem=64G:ngpus=1
 #PBS -l walltime=60:00:00
