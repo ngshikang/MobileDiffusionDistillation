@@ -1,9 +1,9 @@
 #!/bin/bash
 
-#PBS -N DistillationOriginal
+#PBS -N DistillationSwish
 #PBS -q normal
-#PBS -l select=1:ncpus=2:mem=64G:ngpus=1
-#PBS -l walltime=60:00:00
+#PBS -l select=2:ncpus=8:mem=128G:ngpus=1
+#PBS -l walltime=00:60:00
 #PBS -P Personal
 #PBS -o out-run.txt
 #PBS -e errors.txt
