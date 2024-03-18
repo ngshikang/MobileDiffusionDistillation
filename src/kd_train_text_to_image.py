@@ -886,7 +886,7 @@ def main():
                     wandb_tracker.log(
                         {
                             "validation": [
-                                wandb.Image(image, caption=f"Version {kk} of {args.valid_prompt}")
+                                wandb.Image(image, caption=f"{args.valid_prompt}")
                             ]
                         }
                     )
