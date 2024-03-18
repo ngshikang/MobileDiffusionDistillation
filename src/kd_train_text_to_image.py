@@ -53,14 +53,11 @@ import time
 import copy
 
 # try to import wandb
-try:
-    import wandb
-    has_wandb = True
-except:
-    has_wandb = False
+import wandb
+has_wandb = True
 
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
-check_min_version("0.15.0")
+check_min_version("0.27.0.dev0")
 
 logger = get_logger(__name__, log_level="INFO")
 
@@ -302,7 +299,7 @@ def parse_args():
     parser.add_argument(
         "--report_to",
         type=str,
-        default="tensorboard",
+        default="wandb",
         help=(
             'The integration to report the results and logs to. Supported platforms are `"tensorboard"`'
             ' (default), `"wandb"` and `"comet_ml"`. Use `"all"` to report to all integrations.'
@@ -886,7 +883,13 @@ def main():
                     tmp_name = os.path.join(val_img_dir, f"gstep{global_step}_epoch{epoch}_step{step}_{kk}.png")
                     # print(tmp_name)
                     image.save(tmp_name)
-                    wandb.Image(image, caption=f"Version {kk} of {args.valid_prompt}")
+                    wandb_tracker.log(
+                        {
+                            "validation": [
+                                wandb.Image(image, caption=f"Version {kk} of {args.valid_prompt}")
+                            ]
+                        }
+                    )
 
                 del pipeline
                 torch.cuda.empty_cache()
