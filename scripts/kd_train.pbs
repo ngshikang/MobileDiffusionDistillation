@@ -12,7 +12,7 @@ source activate distillation
 
 MODEL_NAME="CompVis/stable-diffusion-v1-4"
 TRAIN_DATA_DIR="scratch/MobileDiffusionDistillation/data/laion_aes/preprocessed_212k" # please adjust it if needed
-UNET_CONFIG_PATH="scratch/MobileDiffusionDistillation/src/unet_config"
+UNET_CONFIG_PATH="scratch/MobileDiffusionDistillation/src/unet_config_mdcustom"
 
 UNET_NAME="bk_tiny" # option: ["bk_base", "bk_small", "bk_tiny"]
 OUTPUT_DIR="scratch/MobileDiffusionDistillation/results/kd_"$UNET_NAME # please adjust it if needed
