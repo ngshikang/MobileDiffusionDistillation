@@ -649,7 +649,9 @@ def main():
     # We need to initialize the trackers we use, and also store our configuration.
     # The trackers initializes automatically on the main process.
     if accelerator.is_main_process:
-        accelerator.init_trackers("distillation-swish", config=vars(args))
+        from datetime import datetime
+        timenow = datetime.now()
+        accelerator.init_trackers("distillation-swish", config=vars(args), init_kwargs={"wandb":{"name":args.unet_config_path.split("/")[-1]+"_"+args.unet_config_name+"_"+str(timenow)}})
 
     # Train!
     total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
