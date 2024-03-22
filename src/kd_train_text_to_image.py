@@ -85,19 +85,19 @@ def copy_weight_from_teacher(unet_stu, unet_tea, student_type):
         connect_info['up_blocks.3.attentions.1.'] = 'up_blocks.3.attentions.2.'
     elif student_type in ["bk_tiny"]:
         connect_info['up_blocks.0.resnets.0.'] = 'up_blocks.1.resnets.0.'
-        # connect_info['up_blocks.0.attentions.0.'] = 'up_blocks.1.attentions.0.'
+        connect_info['up_blocks.0.attentions.0.'] = 'up_blocks.1.attentions.0.'
         connect_info['up_blocks.0.resnets.1.'] = 'up_blocks.1.resnets.2.'
-        # connect_info['up_blocks.0.attentions.1.'] = 'up_blocks.1.attentions.2.'
+        connect_info['up_blocks.0.attentions.1.'] = 'up_blocks.1.attentions.2.'
         connect_info['up_blocks.0.upsamplers.'] = 'up_blocks.1.upsamplers.'
         connect_info['up_blocks.1.resnets.0.'] = 'up_blocks.2.resnets.0.'
-        # connect_info['up_blocks.1.attentions.0.'] = 'up_blocks.2.attentions.0.'
+        connect_info['up_blocks.1.attentions.0.'] = 'up_blocks.2.attentions.0.'
         connect_info['up_blocks.1.resnets.1.'] = 'up_blocks.2.resnets.2.'
-        # connect_info['up_blocks.1.attentions.1.'] = 'up_blocks.2.attentions.2.'
+        connect_info['up_blocks.1.attentions.1.'] = 'up_blocks.2.attentions.2.'
         connect_info['up_blocks.1.upsamplers.'] = 'up_blocks.2.upsamplers.'
         connect_info['up_blocks.2.resnets.0.'] = 'up_blocks.3.resnets.0.'
-        # connect_info['up_blocks.2.attentions.0.'] = 'up_blocks.3.attentions.0.'
+        connect_info['up_blocks.2.attentions.0.'] = 'up_blocks.3.attentions.0.'
         connect_info['up_blocks.2.resnets.1.'] = 'up_blocks.3.resnets.2.'
-        # connect_info['up_blocks.2.attentions.1.'] = 'up_blocks.3.attentions.2.'       
+        connect_info['up_blocks.2.attentions.1.'] = 'up_blocks.3.attentions.2.'       
     else:
         raise NotImplementedError
 
@@ -115,7 +115,7 @@ def copy_weight_from_teacher(unet_stu, unet_tea, student_type):
             print(f"** forced COPY {k_orig} -> {k}")
         else:
             print(f"normal COPY {k_orig} -> {k}")
-        unet_stu.state_dict()[k].copy_(unet_tea.state_dict()[k_orig])
+        # unet_stu.state_dict()[k].copy_(unet_tea.state_dict()[k_orig])
 
     return unet_stu
 
