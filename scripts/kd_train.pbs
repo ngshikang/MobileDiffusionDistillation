@@ -17,7 +17,7 @@ UNET_CONFIG_PATH="scratch/MobileDiffusionDistillation/src/unet_config_mdcustom"
 UNET_NAME="bk_tiny" # option: ["bk_base", "bk_small", "bk_tiny"]
 OUTPUT_DIR="scratch/MobileDiffusionDistillation/results/kd_"$UNET_NAME # please adjust it if needed
 
-BATCH_SIZE=64
+BATCH_SIZE=16
 GRAD_ACCUMULATION=4
 
 StartTime=$(date +%s)
