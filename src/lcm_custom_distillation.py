@@ -479,7 +479,7 @@ def main():
     #     with redirect_stdout(f):
     #         print(pipeline.unet.state_dict().keys())
 
-    unet_teacher = pipeline.unet
+    unet_teacher = pipeline.unet.to(torch.float16)
     
     config_student = UNet2DConditionModel.load_config(args.unet_config_path, subfolder=args.unet_config_name)
     unet = UNet2DConditionModel.from_config(config_student, revision=args.non_ema_revision)
