@@ -49,6 +49,8 @@ from diffusers.training_utils import EMAModel
 from diffusers.utils import check_min_version, deprecate
 from diffusers.utils.import_utils import is_xformers_available
 
+from peft import PeftConfig
+
 import csv
 import time
 import copy
@@ -449,7 +451,9 @@ def main():
     unet_teacher = UNet2DConditionModel.from_pretrained(
         args.pretrained_model_name_or_path, subfolder="unet", revision=args.non_ema_revision
     )
-    unet_teacher.add_adapter(args.adapter_id)
+    adapter_config = PeftConfig.from_pretrained(args.adapter_id)
+
+    unet_teacher.add_adapter(adapter_config)
 
     config_student = UNet2DConditionModel.load_config(args.unet_config_path, subfolder=args.unet_config_name)
     unet = UNet2DConditionModel.from_config(config_student, revision=args.non_ema_revision)
