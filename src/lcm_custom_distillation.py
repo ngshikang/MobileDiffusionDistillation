@@ -133,7 +133,7 @@ def parse_args():
         "--adapter_id",
         type=str,
         default="latent-consistency/lcm-lora-sdv1-5",
-        required=True,
+        required=False,
         help="Path to pretrained adapter from huggingface",
     )
     parser.add_argument(
@@ -431,7 +431,12 @@ def main():
         os.makedirs(args.output_dir, exist_ok=True)
 
     # Load scheduler, tokenizer and models.
-    
+    pipeline = AutoPipelineForText2Image.from_pretrained(
+                    args.pretrained_model_name_or_path,
+                    torch_dtype=torch.float16, 
+                    variant="fp16",
+                    safety_checker=None,
+                )
     noise_scheduler = LCMScheduler.from_pretrained(pipeline.scheduler.config)
     tokenizer = CLIPTokenizer.from_pretrained(
         args.pretrained_model_name_or_path, subfolder="tokenizer", revision=args.revision
@@ -875,7 +880,6 @@ def main():
                     torch_dtype=torch.float16, 
                     variant="fp16",
                     safety_checker=None,
-                    revision=args.revision,
                 )
                 pipeline = pipeline.to(accelerator.device)
                 pipeline.set_progress_bar_config(disable=True)
@@ -923,7 +927,6 @@ def main():
             text_encoder=text_encoder,
             vae=vae,
             unet=unet,
-            revision=args.revision,
             torch_dtype=torch.float16, 
             variant="fp16"
         )

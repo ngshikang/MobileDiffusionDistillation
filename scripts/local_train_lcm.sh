@@ -3,6 +3,7 @@
 source activate bk-sdm
 
 MODEL_NAME="lykon/dreamshaper-7"
+ADAPTER_ID="latent-consistency/lcm-lora-sdv1-5"
 TRAIN_DATA_DIR="./data/laion_aes/preprocessed_212k" # please adjust it if needed
 UNET_CONFIG_PATH="./src/unet_config"
 
@@ -35,8 +36,8 @@ CUDA_VISIBLE_DEVICES=0 accelerate launch ./src/lcm_custom_distillation.py \
   --use_copy_weight_from_teacher \
   --unet_config_path $UNET_CONFIG_PATH --unet_config_name $UNET_NAME \
   --output_dir $OUTPUT_DIR \
-  --valid_prompt "portrait photo of muscular bearded guy in a worn mech suit, light bokeh, intricate, steel metal, elegant, sharp focus, soft lighting, vibrant colors"
-
+  --valid_prompt "portrait photo of muscular bearded guy in a worn mech suit, light bokeh, intricate, steel metal, elegant, sharp focus, soft lighting, vibrant colors" \
+  --adapter_id $ADAPTER_ID
 
 EndTime=$(date +%s)
 echo "** KD training takes $(($EndTime - $StartTime)) seconds."
