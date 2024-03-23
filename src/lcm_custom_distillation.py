@@ -883,26 +883,27 @@ def main():
 
                 if not os.path.exists(os.path.join(val_img_dir, "teacher_0.png")):
                     for kk in range(args.num_valid_images):
-                        image = pipeline(args.valid_prompt, num_inference_steps=50, generator=generator).images[0]
-                        tmp_name = os.path.join(val_img_dir, f"teacher_{kk}.png")
-                        image.save(tmp_name)
+                        for infer_step in [1,2,4,8]:
+                            image = pipeline(args.valid_prompt, num_inference_steps=infer_step, generator=generator, guidance_scale=0).images[0]
+                            tmp_name = os.path.join(val_img_dir, f"teacher_{kk}_{infer_step}.png")
+                            image.save(tmp_name)
 
                 # set `keep_fp32_wrapper` to True because we do not want to remove
                 # mixed precision hooks while we are still training
                 pipeline.unet = accelerator.unwrap_model(unet, keep_fp32_wrapper=True).to(accelerator.device)
               
                 for kk in range(args.num_valid_images):
-                    image = pipeline(args.valid_prompt, num_inference_steps=50, generator=generator).images[0]
-                    tmp_name = os.path.join(val_img_dir, f"gstep{global_step}_epoch{epoch}_step{step}_{kk}.png")
-                    # print(tmp_name)
-                    image.save(tmp_name)
-                    wandb_tracker.log(
-                        {
-                            "validation": [
-                                wandb.Image(image, caption=f"{args.valid_prompt}")
-                            ]
-                        }
-                    )
+                    for infer_step in [1,2,4,8]:
+                        image = pipeline(args.valid_prompt, num_inference_steps=50, generator=generator).images[0]
+                        tmp_name = os.path.join(val_img_dir, f"gstep{global_step}_epoch{epoch}_step{step}_{kk}_{infer_step}.png")
+                        image.save(tmp_name)
+                        wandb_tracker.log(
+                            {
+                                "validation": [
+                                    wandb.Image(image, caption=f"{args.valid_prompt}_step{infer_step}")
+                                ]
+                            }
+                        )
 
                 del pipeline
                 torch.cuda.empty_cache()
