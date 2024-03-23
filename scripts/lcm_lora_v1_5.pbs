@@ -3,14 +3,14 @@
 #PBS -N DreamshaperDistillation
 #PBS -q normal
 #PBS -l select=2:ncpus=8:mem=128G:ngpus=1
-#PBS -l walltime=60:00:00
+#PBS -l walltime=12:00:00
 #PBS -P Personal
 #PBS -o out-run.txt
 #PBS -e errors.txt
 
 source activate distillation
 
-MODEL_NAME="lykon/dreamshaper-8"
+MODEL_NAME="latent-consistency/lcm-lora-sdv1-5"
 TRAIN_DATA_DIR="scratch/MobileDiffusionDistillation/data/laion_aes/preprocessed_212k" # please adjust it if needed
 UNET_CONFIG_PATH="scratch/MobileDiffusionDistillation/src/unet_config"
 
