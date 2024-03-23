@@ -451,9 +451,8 @@ def main():
     unet_teacher = UNet2DConditionModel.from_pretrained(
         args.pretrained_model_name_or_path, subfolder="unet", revision=args.non_ema_revision
     )
-    adapter_config = PeftConfig.from_pretrained(args.adapter_id)
 
-    unet_teacher.add_adapter(adapter_config)
+    unet_teacher.load_adapter(args.adapter_id)
 
     config_student = UNet2DConditionModel.load_config(args.unet_config_path, subfolder=args.unet_config_name)
     unet = UNet2DConditionModel.from_config(config_student, revision=args.non_ema_revision)
