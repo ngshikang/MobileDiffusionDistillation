@@ -14,7 +14,7 @@ GRAD_ACCUMULATION=4
 
 StartTime=$(date +%s)
 
-CUDA_VISIBLE_DEVICES=0 accelerate launch ./src/custom_distillation.py \
+CUDA_VISIBLE_DEVICES=0 accelerate launch ./src/lcm_custom_distillation.py \
   --pretrained_model_name_or_path $MODEL_NAME \
   --train_data_dir $TRAIN_DATA_DIR\
   --use_ema \
