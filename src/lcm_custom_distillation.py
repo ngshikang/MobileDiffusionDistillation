@@ -100,7 +100,8 @@ def copy_weight_from_teacher(unet_stu, unet_tea, student_type):
         connect_info['up_blocks.2.resnets.0.'] = 'up_blocks.3.resnets.0.'
         connect_info['up_blocks.2.attentions.0.'] = 'up_blocks.3.attentions.0.'
         connect_info['up_blocks.2.resnets.1.'] = 'up_blocks.3.resnets.2.'
-        connect_info['up_blocks.2.attentions.1.'] = 'up_blocks.3.attentions.2.'       
+        connect_info['up_blocks.2.attentions.1.'] = 'up_blocks.3.attentions.2.'
+              
     else:
         raise NotImplementedError
 
@@ -113,11 +114,31 @@ def copy_weight_from_teacher(unet_stu, unet_tea, student_type):
                 flag = 1
                 k_orig = k_orig.replace(prefix_key, connect_info[prefix_key])            
                 break
-
+        lora_target_modules =  [
+            "to_q",
+            "to_k",
+            "to_v",
+            "to_out.0",
+            "proj_in",
+            "proj_out",
+            "ff.net.0.proj",
+            "ff.net.2",
+            "conv1",
+            "conv2",
+            "conv_shortcut",
+            "downsamplers.0.conv",
+            "upsamplers.0.conv",
+            "time_emb_proj",
+        ]
+        for layer in lora_target_modules:
+            if layer in k_orig:
+                k_orig = k_orig.replace(layer, f"{layer}.base_layer")
+                
         if flag == 1:
             print(f"** forced COPY {k_orig} -> {k}")
         else:
             print(f"normal COPY {k_orig} -> {k}")
+        print(f"** teacher: {k_orig} -> student: {k}")
         unet_stu.state_dict()[k].copy_(unet_tea.state_dict()[k_orig])
 
     return unet_stu
@@ -448,12 +469,18 @@ def main():
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path, subfolder="vae", revision=args.revision)
 
     # Define teacher and student
-    unet_teacher = UNet2DConditionModel.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="unet", revision=args.non_ema_revision
-    )
+    pipeline.unet = UNet2DConditionModel.from_pretrained(args.pretrained_model_name_or_path, subfolder="unet", revision=args.revision)
+    pipeline.load_lora_weights(args.adapter_id)
+    pipeline.fuse_lora()
 
-    unet_teacher.load_adapter(args.adapter_id)
+    # from contextlib import redirect_stdout
 
+    # with open('unet_model_after_lora_fuse_state_dict.txt', 'w') as f:
+    #     with redirect_stdout(f):
+    #         print(pipeline.unet.state_dict().keys())
+
+    unet_teacher = pipeline.unet
+    
     config_student = UNet2DConditionModel.load_config(args.unet_config_path, subfolder=args.unet_config_name)
     unet = UNet2DConditionModel.from_config(config_student, revision=args.non_ema_revision)
 

@@ -43,7 +43,7 @@ CUDA_VISIBLE_DEVICES=0 accelerate launch scratch/MobileDiffusionDistillation/src
   --use_copy_weight_from_teacher \
   --unet_config_path $UNET_CONFIG_PATH --unet_config_name $UNET_NAME \
   --output_dir $OUTPUT_DIR \
-  --checkpoints_total_limit 2 \
+  --checkpoints_total_limit 1 \
   --valid_prompt "portrait photo of muscular bearded guy in a worn mech suit, light bokeh, intricate, steel metal, elegant, sharp focus, soft lighting, vibrant colors"
 
 
