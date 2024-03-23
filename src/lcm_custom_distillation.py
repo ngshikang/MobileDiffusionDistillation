@@ -487,6 +487,8 @@ def main():
     # Copy weights from teacher to student
     if args.use_copy_weight_from_teacher:
         copy_weight_from_teacher(unet, unet_teacher, args.unet_config_name)
+
+    unet = unet.to(torch.float16)
    
     # Freeze student's vae and text_encoder and teacher's unet
     vae.requires_grad_(False)
@@ -497,6 +499,7 @@ def main():
     if args.use_ema:
         ema_unet = UNet2DConditionModel.from_config(config_student, revision=args.revision)
         ema_unet = EMAModel(ema_unet.parameters(), model_cls=UNet2DConditionModel, model_config=ema_unet.config)
+        ema_unet = ema_unet.to(torch.float16)
 
     if args.enable_xformers_memory_efficient_attention:
         if is_xformers_available():
@@ -910,6 +913,7 @@ def main():
                     variant="fp16",
                     safety_checker=None,
                 )
+                pipeline.scheduler = LCMScheduler.from_config(pipeline.scheduler.config)
                 pipeline = pipeline.to(accelerator.device)
                 pipeline.set_progress_bar_config(disable=True)
                 generator = torch.Generator(device=accelerator.device).manual_seed(args.seed)
@@ -927,7 +931,7 @@ def main():
               
                 for kk in range(args.num_valid_images):
                     for infer_step in [1,2,4,8]:
-                        image = pipeline(args.valid_prompt, num_inference_steps=50, generator=generator).images[0]
+                        image = pipeline(args.valid_prompt, num_inference_steps=infer_step, generator=generator).images[0]
                         tmp_name = os.path.join(val_img_dir, f"gstep{global_step}_epoch{epoch}_step{step}_{kk}_{infer_step}.png")
                         image.save(tmp_name)
                         wandb_tracker.log(
