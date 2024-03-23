@@ -34,15 +34,16 @@ CUDA_VISIBLE_DEVICES=0 accelerate launch scratch/MobileDiffusionDistillation/src
   --max_grad_norm 1 \
   --lr_scheduler="constant" --lr_warmup_steps=0 \
   --report_to="wandb" \
-  --max_train_steps=500000 \
+  --max_train_steps=400000 \
   --seed 1234 \
   --gradient_accumulation_steps $GRAD_ACCUMULATION \
-  --checkpointing_steps 1000 \
+  --checkpointing_steps 5000 \
   --valid_steps 100 \
   --lambda_sd 1.0 --lambda_kd_output 1.0 --lambda_kd_feat 1.0 \
   --use_copy_weight_from_teacher \
   --unet_config_path $UNET_CONFIG_PATH --unet_config_name $UNET_NAME \
   --output_dir $OUTPUT_DIR \
+  --checkpoints_total_limit 2 \
   --valid_prompt "portrait photo of muscular bearded guy in a worn mech suit, light bokeh, intricate, steel metal, elegant, sharp focus, soft lighting, vibrant colors"
 
 
