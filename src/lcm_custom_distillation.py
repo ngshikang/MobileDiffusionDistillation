@@ -660,7 +660,7 @@ def main():
     if accelerator.is_main_process:
         from datetime import datetime
         timenow = datetime.now()
-        accelerator.init_trackers("distillation-swish", config=vars(args), init_kwargs={"wandb":{"name":args.pretrained_model_name_or_path.split("/")[-1]+"_"+args.unet_config_name+"_"+str(timenow)}})
+        accelerator.init_trackers("distillation-swish", config=vars(args), init_kwargs={"wandb":{"name":args.pretrained_model_name_or_path.split("/")[-1]+"_" + args.adapter_id +"_"+args.unet_config_name+"_"+str(timenow)}})
 
     # Train!
     total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
