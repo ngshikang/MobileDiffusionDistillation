@@ -870,25 +870,43 @@ def main():
                 pipeline.set_progress_bar_config(disable=True)
                 generator = torch.Generator(device=accelerator.device).manual_seed(args.seed)
 
-                if not os.path.exists(os.path.join(val_img_dir, "teacher_0.png")):
+                def image_collage(imgs):
+                    min_shape = sorted( [(np.sum(i.size), i.size ) for i in imgs])[0][1]
+                    imgs_comb = np.vstack([i.resize(min_shape) for i in imgs])
+                    return imgs_comb
+
+                # if not os.path.exists(os.path.join(val_img_dir, "teacher_0.png")):
+                if global_step < 3:
                     for kk in range(args.num_valid_images):
-                        image = pipeline(args.valid_prompt, num_inference_steps=25, generator=generator).images[0]
-                        tmp_name = os.path.join(val_img_dir, f"teacher_{kk}.png")
-                        image.save(tmp_name)
+                        teacher_images = []
+                        for infer_step in [1,5,10,25]:
+                            image = pipeline(args.valid_prompt, num_inference_steps=infer_step, generator=generator, guidance_scale=0).images[0]
+                            tmp_name = os.path.join(val_img_dir, f"teacher_{kk}_{infer_step}.png")
+                            image.save(tmp_name)
+                            teacher_images.append(image)
+                        wandb_tracker.log(
+                            {
+                                "teacher_validation": [
+                                    wandb.Image(image_collage(teacher_images), caption=f"{args.valid_prompt}")
+                                ]
+                            }
+                        )
 
                 # set `keep_fp32_wrapper` to True because we do not want to remove
                 # mixed precision hooks while we are still training
                 pipeline.unet = accelerator.unwrap_model(unet, keep_fp32_wrapper=True).to(accelerator.device)
               
                 for kk in range(args.num_valid_images):
-                    image = pipeline(args.valid_prompt, num_inference_steps=25, generator=generator).images[0]
-                    tmp_name = os.path.join(val_img_dir, f"gstep{global_step}_epoch{epoch}_step{step}_{kk}.png")
-                    # print(tmp_name)
-                    image.save(tmp_name)
+                    student_images = []
+                    for infer_step in [1,5,10,25]:
+                        image = pipeline(args.valid_prompt, num_inference_steps=infer_step, generator=generator).images[0]
+                        tmp_name = os.path.join(val_img_dir, f"gstep{global_step}_epoch{epoch}_step{step}_{kk}_{infer_step}.png")
+                        image.save(tmp_name)
+                        student_images.append(image)
                     wandb_tracker.log(
                         {
-                            "validation": [
-                                wandb.Image(image, caption=f"{args.valid_prompt}")
+                            "student_validation": [
+                                    wandb.Image(image_collage(student_images), caption=f"{args.valid_prompt}")
                             ]
                         }
                     )
