@@ -38,6 +38,11 @@ if __name__ == "__main__":
 
     unet = UNet2DConditionModel.from_pretrained(args.unet_path, subfolder='unet')
     pipeline.pipe.unet = unet.half().to(args.device)
+    
+    if args.device == 'cpu':
+        pipeline.pipe.unet = pipeline.pipe.unet.full()
+        pipeline.pipe.text_encoder = pipeline.pipe.text_encoder.full()
+
 
     # if args.use_dpm_solver:    
     #     print(" ** replace PNDM scheduler into DPM-Solver")
