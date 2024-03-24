@@ -912,7 +912,7 @@ def main():
                     safety_checker=None,
                     revision=args.revision,            
                             )
-                pipeline.add_adapter(args.adapter_id)
+                pipeline.load_lora_weights(args.adapter_id)
                 pipeline.fuse_lora()
                 pipeline.scheduler = LCMScheduler.from_config(pipeline.scheduler.config)
                 pipeline = pipeline.to(accelerator.device)
@@ -943,7 +943,7 @@ def main():
                 # set `keep_fp32_wrapper` to True because we do not want to remove
                 # mixed precision hooks while we are still training
                 pipeline.unet = accelerator.unwrap_model(unet, keep_fp32_wrapper=True).to(accelerator.device)
-                pipeline.load_adapter(args.adapter_id)
+                pipeline.load_lora_weights(args.adapter_id)
                 pipeline.fuse_lora()
 
                 for kk in range(args.num_valid_images):
