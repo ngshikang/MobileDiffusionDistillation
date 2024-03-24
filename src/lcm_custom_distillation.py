@@ -913,6 +913,8 @@ def main():
                     revision=args.revision,            
                             )
                 pipeline.scheduler = LCMScheduler.from_config(pipeline.scheduler.config)
+                pipeline.add_adapter(args.adapter_id)
+                pipeline.fuse_lora()
                 pipeline = pipeline.to(accelerator.device)
                 pipeline.set_progress_bar_config(disable=True)
                 generator = torch.Generator(device=accelerator.device).manual_seed(args.seed)

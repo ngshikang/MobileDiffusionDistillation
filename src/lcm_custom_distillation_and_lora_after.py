@@ -912,6 +912,8 @@ def main():
                     safety_checker=None,
                     revision=args.revision,            
                             )
+                pipeline.add_adapter(args.adapter_id)
+                pipeline.fuse_lora()
                 pipeline.scheduler = LCMScheduler.from_config(pipeline.scheduler.config)
                 pipeline = pipeline.to(accelerator.device)
                 pipeline.set_progress_bar_config(disable=True)
@@ -943,7 +945,7 @@ def main():
                 pipeline.unet = accelerator.unwrap_model(unet, keep_fp32_wrapper=True).to(accelerator.device)
                 pipeline.load_adapter(args.adapter_id)
                 pipeline.fuse_lora()
-                
+
                 for kk in range(args.num_valid_images):
                     student_images = []
                     for infer_step in [1,2,4,8]:
