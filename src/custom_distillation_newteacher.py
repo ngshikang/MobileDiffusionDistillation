@@ -42,7 +42,7 @@ from datasets import concatenate_datasets, load_dataset
 from packaging import version
 from torchvision import transforms
 from tqdm.auto import tqdm
-from transformers import CLIPTextModel, CLIPTokenizer, AutoTokenizer
+from transformers import CLIPTextModel, CLIPTokenizer, AutoTokenizer, PretrainedConfig
 from torchvision.transforms.functional import crop
 
 import diffusers
