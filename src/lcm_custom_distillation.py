@@ -380,6 +380,9 @@ def parse_args():
     parser.add_argument("--use_copy_weight_from_teacher", action="store_true", help="Whether to initialize unet student with teacher's weights",)
 
     args = parser.parse_args()
+
+    args.num_valid_images = len(args.valid_prompt.split(';'))+1
+
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
     if env_local_rank != -1 and env_local_rank != args.local_rank:
         args.local_rank = env_local_rank
@@ -453,11 +456,10 @@ def main():
         os.makedirs(args.output_dir, exist_ok=True)
 
     # Load scheduler, tokenizer and models.
-    pipeline = AutoPipelineForText2Image.from_pretrained(
+    pipeline = StableDiffusionPipeline.from_pretrained(
                     args.pretrained_model_name_or_path,
-                    torch_dtype=torch.float16, 
-                    variant="fp16",
                     safety_checker=None,
+                    revision=args.revision,
                 )
     noise_scheduler = LCMScheduler.from_config(pipeline.scheduler.config)
     tokenizer = CLIPTokenizer.from_pretrained(
@@ -479,7 +481,7 @@ def main():
     #     with redirect_stdout(f):
     #         print(pipeline.unet.state_dict().keys())
 
-    unet_teacher = pipeline.unet.to(torch.float16)
+    unet_teacher = pipeline.unet
     
     config_student = UNet2DConditionModel.load_config(args.unet_config_path, subfolder=args.unet_config_name)
     unet = UNet2DConditionModel.from_config(config_student, revision=args.non_ema_revision)
@@ -487,8 +489,6 @@ def main():
     # Copy weights from teacher to student
     if args.use_copy_weight_from_teacher:
         copy_weight_from_teacher(unet, unet_teacher, args.unet_config_name)
-
-    unet = unet.to(torch.float16)
    
     # Freeze student's vae and text_encoder and teacher's unet
     vae.requires_grad_(False)
@@ -499,7 +499,7 @@ def main():
     if args.use_ema:
         ema_unet = UNet2DConditionModel.from_config(config_student, revision=args.revision)
         ema_unet = EMAModel(ema_unet.parameters(), model_cls=UNet2DConditionModel, model_config=ema_unet.config)
-        ema_unet = ema_unet.to(torch.float16)
+        ema_unet = ema_unet
 
     if args.enable_xformers_memory_efficient_attention:
         if is_xformers_available():
@@ -907,40 +907,55 @@ def main():
                     f" {args.valid_prompt}."
                 )
                 # create pipeline
-                pipeline = AutoPipelineForText2Image.from_pretrained(
+                pipeline = StableDiffusionPipeline.from_pretrained(
                     args.pretrained_model_name_or_path,
-                    torch_dtype=torch.float16, 
-                    variant="fp16",
                     safety_checker=None,
-                )
+                    revision=args.revision,            
+                            )
                 pipeline.scheduler = LCMScheduler.from_config(pipeline.scheduler.config)
                 pipeline = pipeline.to(accelerator.device)
                 pipeline.set_progress_bar_config(disable=True)
                 generator = torch.Generator(device=accelerator.device).manual_seed(args.seed)
 
-                if not os.path.exists(os.path.join(val_img_dir, "teacher_0.png")):
-                    for kk in range(args.num_valid_images):
-                        for infer_step in [1,2,4,8]:
-                            image = pipeline(args.valid_prompt, num_inference_steps=infer_step, generator=generator, guidance_scale=0).images[0]
-                            tmp_name = os.path.join(val_img_dir, f"teacher_{kk}_{infer_step}.png")
-                            image.save(tmp_name)
+                def image_collage(imgs):
+                    min_shape = sorted( [(np.sum(i.size), i.size ) for i in imgs])[0][1]
+                    imgs_comb = np.vstack([i.resize(min_shape) for i in imgs])
+                    return imgs_comb
+
+                # if not os.path.exists(os.path.join(val_img_dir, "teacher_0.png")):
+                for kk in range(args.num_valid_images):
+                    teacher_images = []
+                    for infer_step in [1,2,4,8]:
+                        image = pipeline(args.valid_prompt, num_inference_steps=infer_step, generator=generator, guidance_scale=0).images[0]
+                        tmp_name = os.path.join(val_img_dir, f"teacher_{kk}_{infer_step}.png")
+                        image.save(tmp_name)
+                        teacher_images.append(image)
+                    wandb_tracker.log(
+                        {
+                            "teacher_validation": [
+                                wandb.Image(image_collage(teacher_images), caption=f"{args.valid_prompt}")
+                            ]
+                        }
+                    )
 
                 # set `keep_fp32_wrapper` to True because we do not want to remove
                 # mixed precision hooks while we are still training
                 pipeline.unet = accelerator.unwrap_model(unet, keep_fp32_wrapper=True).to(accelerator.device)
               
                 for kk in range(args.num_valid_images):
+                    student_images = []
                     for infer_step in [1,2,4,8]:
                         image = pipeline(args.valid_prompt, num_inference_steps=infer_step, generator=generator).images[0]
                         tmp_name = os.path.join(val_img_dir, f"gstep{global_step}_epoch{epoch}_step{step}_{kk}_{infer_step}.png")
                         image.save(tmp_name)
-                        wandb_tracker.log(
-                            {
-                                "validation": [
-                                    wandb.Image(image, caption=f"{args.valid_prompt}_step{infer_step}")
-                                ]
-                            }
-                        )
+                        student_images.append(image)
+                    wandb_tracker.log(
+                        {
+                            "student_validation": [
+                                    wandb.Image(image_collage(student_images), caption=f"{args.valid_prompt}")
+                            ]
+                        }
+                    )
 
                 del pipeline
                 torch.cuda.empty_cache()
@@ -955,13 +970,12 @@ def main():
         if args.use_ema:
             ema_unet.copy_to(unet.parameters())
 
-        pipeline = AutoPipelineForText2Image.from_pretrained(
+        pipeline = StableDiffusionPipeline.from_pretrained(
             args.pretrained_model_name_or_path,
             text_encoder=text_encoder,
             vae=vae,
             unet=unet,
-            torch_dtype=torch.float16, 
-            variant="fp16"
+            revision=args.revision,
         )
         pipeline.scheduler = LCMScheduler.from_config(pipeline.scheduler.config)
         pipeline.save_pretrained(args.output_dir)

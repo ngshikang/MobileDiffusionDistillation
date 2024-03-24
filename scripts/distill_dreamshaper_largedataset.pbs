@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#PBS -N DreamshaperDistillation
+#PBS -N DreamLargeDataDistillation
 #PBS -q normal
 #PBS -l select=2:ncpus=8:mem=128G:ngpus=1
 #PBS -l walltime=00:90:00
