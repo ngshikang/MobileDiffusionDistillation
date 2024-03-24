@@ -574,17 +574,17 @@ def main():
     new_teacher_model = 'lykon/dreamshaper-xl-lightning'
     new_teacher_revision = None
     new_teacher_variant = "fp16"
-    # pipe = AutoPipelineForText2Image.from_pretrained(new_teacher_model, torch_dtype=torch.float16, variant=new_teacher_variant)
-    # pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-    # pipe = pipe.to("cuda")
+    nt_pipe = AutoPipelineForText2Image.from_pretrained(new_teacher_model, torch_dtype=torch.float16, variant=new_teacher_variant)
+    nt_pipe.scheduler = DPMSolverMultistepScheduler.from_config(nt_pipe.scheduler.config)
+    nt_pipe = nt_pipe.to("cuda")
     nt_tokenizer_one = AutoTokenizer.from_pretrained(
-        args.pretrained_model_name_or_path,
+        new_teacher_model,
         subfolder="tokenizer",
         revision=new_teacher_revision,
         use_fast=False,
     )
     nt_tokenizer_two = AutoTokenizer.from_pretrained(
-        args.pretrained_model_name_or_path,
+        new_teacher_model,
         subfolder="tokenizer_2",
         revision=new_teacher_revision,
         use_fast=False,
@@ -594,10 +594,10 @@ def main():
         new_teacher_model, new_teacher_revision, subfolder="text_encoder_2"
     )
     nt_noise_scheduler = DDPMScheduler.from_pretrained(new_teacher_model, subfolder="scheduler")
-    nt_text_encoder_one = text_encoder_cls_one.from_pretrained(
+    nt_text_encoder_one = nt_text_encoder_cls_one.from_pretrained(
        new_teacher_model, subfolder="text_encoder", revision=new_teacher_revision, variant=new_teacher_variant
     )
-    nt_text_encoder_two = text_encoder_cls_two.from_pretrained(
+    nt_text_encoder_two = nt_text_encoder_cls_two.from_pretrained(
         new_teacher_model, subfolder="text_encoder_2", revision=new_teacher_revision, variant=new_teacher_variant
     )
     nt_vae_path = (
@@ -751,6 +751,50 @@ def main():
         ]
     )
 
+    train_resize = transforms.Resize(args.resolution, interpolation=transforms.InterpolationMode.BILINEAR)
+    train_crop = transforms.CenterCrop(args.resolution) if args.center_crop else transforms.RandomCrop(args.resolution)
+    train_flip = transforms.RandomHorizontalFlip(p=1.0)
+    train_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize([0.5], [0.5])])
+
+
+    def preprocess_train(examples):
+        images = [image.convert("RGB") for image in examples[image_column]]
+        examples["pixel_values"] = [train_transforms(image) for image in images]
+        examples["input_ids"] = tokenize_captions(examples)
+
+        original_sizes = []
+        all_images = []
+        crop_top_lefts = []
+        for image in images:
+            original_sizes.append((image.height, image.width))
+            image = train_resize(image)
+            if args.random_flip and random.random() < 0.5:
+                # flip
+                image = train_flip(image)
+            if args.center_crop:
+                y1 = max(0, int(round((image.height - args.resolution) / 2.0)))
+                x1 = max(0, int(round((image.width - args.resolution) / 2.0)))
+                image = train_crop(image)
+            else:
+                y1, x1, h, w = train_crop.get_params(image, (args.resolution, args.resolution))
+                image = crop(image, y1, x1, h, w)
+            crop_top_left = (y1, x1)
+            crop_top_lefts.append(crop_top_left)
+            image = train_transforms(image)
+            all_images.append(image)
+
+        examples["original_sizes"] = original_sizes
+        examples["crop_top_lefts"] = crop_top_lefts
+        examples["pixel_values"] = all_images
+
+        return examples
+
+    with accelerator.main_process_first():
+        if args.max_train_samples is not None:
+            dataset = dataset.shuffle(seed=args.seed).select(range(args.max_train_samples))
+        # Set the training transforms
+        train_dataset = dataset.with_transform(preprocess_train)
+
     text_encoders = [text_encoder_one, text_encoder_two]
     tokenizers = [tokenizer_one, tokenizer_two]
     compute_embeddings_fn = functools.partial(
@@ -762,23 +806,48 @@ def main():
     )
     compute_vae_encodings_fn = functools.partial(compute_vae_encodings, vae=vae)
 
-    def preprocess_train(examples):
-        images = [image.convert("RGB") for image in examples[image_column]]
-        examples["pixel_values"] = [train_transforms(image) for image in images]
-        examples["input_ids"] = tokenize_captions(examples)
-        return examples
-
     with accelerator.main_process_first():
-        if args.max_train_samples is not None:
-            dataset = dataset.shuffle(seed=args.seed).select(range(args.max_train_samples))
-        # Set the training transforms
-        train_dataset = dataset.with_transform(preprocess_train)
+        from datasets.fingerprint import Hasher
+
+        # fingerprint used by the cache for the other processes to load the result
+        # details: https://github.com/huggingface/diffusers/pull/4038#discussion_r1266078401
+        new_fingerprint = Hasher.hash(args)
+        new_fingerprint_for_vae = Hasher.hash(nt_vae_path)
+        train_dataset_with_embeddings = train_dataset.map(
+            compute_embeddings_fn, batched=True, new_fingerprint=new_fingerprint
+        )
+        train_dataset_with_vae = train_dataset.map(
+            compute_vae_encodings_fn,
+            batched=True,
+            batch_size=args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps,
+            new_fingerprint=new_fingerprint_for_vae,
+        )
+        precomputed_dataset = concatenate_datasets(
+            [train_dataset_with_embeddings, train_dataset_with_vae.remove_columns(["image", "text"])], axis=1
+        )
+        precomputed_dataset = precomputed_dataset.with_transform(preprocess_train)
+
+    del compute_vae_encodings_fn, compute_embeddings_fn, nt_text_encoder_one, nt_text_encoder_two
+    del text_encoders, tokenizers, nt_vae
+    gc.collect()
+    torch.cuda.empty_cache()
 
     def collate_fn(examples):
         pixel_values = torch.stack([example["pixel_values"] for example in examples])
         pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
         input_ids = torch.stack([example["input_ids"] for example in examples])
-        return {"pixel_values": pixel_values, "input_ids": input_ids}
+
+        model_input = torch.stack([torch.tensor(example["model_input"]) for example in examples])
+        original_sizes = [example["original_sizes"] for example in examples]
+        crop_top_lefts = [example["crop_top_lefts"] for example in examples]
+        prompt_embeds = torch.stack([torch.tensor(example["prompt_embeds"]) for example in examples])
+        pooled_prompt_embeds = torch.stack([torch.tensor(example["pooled_prompt_embeds"]) for example in examples])
+
+        return {"pixel_values": pixel_values, "input_ids": input_ids, "model_input": model_input,
+            "prompt_embeds": prompt_embeds,
+            "pooled_prompt_embeds": pooled_prompt_embeds,
+            "original_sizes": original_sizes,
+            "crop_top_lefts": crop_top_lefts,}
 
     # DataLoaders creation:
     train_dataloader = torch.utils.data.DataLoader(
@@ -958,12 +1027,36 @@ def main():
 
                 # Predict output-KD loss
                 model_pred_teacher = unet_teacher(noisy_latents, timesteps, encoder_hidden_states).sample
+
+                model_input = batch["model_input"].to(accelerator.device)
+                nt_noise = torch.randn_like(model_input)
+                nt_bsz = model_input.shape[0]
+                nt_timesteps = torch.randint(
+                        0, nt_noise_scheduler.config.num_train_timesteps, (nt_bsz,), device=model_input.device
+                    )
+                noisy_model_input = nt_noise_scheduler.add_noise(model_input, nt_noise, nt_timesteps)
+                def compute_time_ids(original_size, crops_coords_top_left):
+                    # Adapted from pipeline.StableDiffusionXLPipeline._get_add_time_ids
+                    target_size = (args.resolution, args.resolution)
+                    add_time_ids = list(original_size + crops_coords_top_left + target_size)
+                    add_time_ids = torch.tensor([add_time_ids])
+                    add_time_ids = add_time_ids.to(accelerator.device, dtype=weight_dtype)
+                    return add_time_ids
+                add_time_ids = torch.cat(
+                    [compute_time_ids(s, c) for s, c in zip(batch["original_sizes"], batch["crop_top_lefts"])]
+                )
+                unet_added_conditions = {"time_ids": add_time_ids}
+                prompt_embeds = batch["prompt_embeds"].to(accelerator.device)
+                pooled_prompt_embeds = batch["pooled_prompt_embeds"].to(accelerator.device)
+                unet_added_conditions.update({"text_embeds": pooled_prompt_embeds})
                 nt_pred = nt_unet(
-                    noisy_latents,
-                    timesteps,
-                    encoder_hidden_states,
+                    noisy_model_input,
+                    nt_timesteps,
+                    prompt_embeds,
+                    added_cond_kwargs=unet_added_conditions,
                     return_dict=False,
                 )[0]
+                nt_pred = nt_pred - nt_noise
                 loss_kd_output_original_teacher = F.mse_loss(model_pred.float(), model_pred_teacher.float(), reduction="mean")
                 loss_kd_output_new_teacher = F.mse_loss(model_pred.float(), nt_pred.float(), reduction="mean")
 
