@@ -169,3 +169,4 @@ cython_debug/
 /results
 /data
 /wandb
+/inference_results
