@@ -12,7 +12,7 @@ source activate distillation
 
 StartTime=$(date +%s)
 
-python src/generate_single_prompt_normal.py --unet_path ./results/nscc_ckpt_15000_dream8_distill --val_prompt "landscape photo of a dog frolicking in the snow, super high-definition, light bokeh, intricate, mature, elegant, sharp focus, soft lighting, vibrant colors" --num_inference_steps 10 --device cpu 
+python scratch/MobileDiffusionDistillation/src/generate_single_prompt_normal.py --unet_path scratch/MobileDiffusionDistillation/results/nscc_ckpt_15000_dream8_distill --val_prompt "landscape photo of a dog frolicking in the snow, super high-definition, light bokeh, intricate, mature, elegant, sharp focus, soft lighting, vibrant colors" --num_inference_steps 10 --device cpu --save_dir scratch/MobileDiffusionDistillation/inference_results/
 
 EndTime=$(date +%s)
 echo "** KD training takes $(($EndTime - $StartTime)) seconds."
