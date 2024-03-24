@@ -574,9 +574,9 @@ def main():
     new_teacher_model = 'lykon/dreamshaper-xl-lightning'
     new_teacher_revision = None
     new_teacher_variant = "fp16"
-    nt_pipe = AutoPipelineForText2Image.from_pretrained(new_teacher_model, torch_dtype=torch.float16, variant=new_teacher_variant)
-    nt_pipe.scheduler = DPMSolverMultistepScheduler.from_config(nt_pipe.scheduler.config)
-    nt_pipe = nt_pipe.to("cuda")
+    # nt_pipe = AutoPipelineForText2Image.from_pretrained(new_teacher_model, torch_dtype=torch.float16, variant=new_teacher_variant)
+    # nt_pipe.scheduler = DPMSolverMultistepScheduler.from_config(nt_pipe.scheduler.config)
+    # nt_pipe = nt_pipe.to("cuda")
     nt_tokenizer_one = AutoTokenizer.from_pretrained(
         new_teacher_model,
         subfolder="tokenizer",
