@@ -40,8 +40,8 @@ if __name__ == "__main__":
     pipeline.pipe.unet = unet.half().to(args.device)
 
     if args.device == 'cpu':
-        pipeline.pipe.unet = pipeline.pipe.unet.full()
-        pipeline.pipe.text_encoder = pipeline.pipe.text_encoder.full()
+        pipeline.pipe.unet = pipeline.pipe.unet.float32().to(args.device)
+        pipeline.pipe.text_encoder = pipeline.pipe.text_encoder.float32().to(args.device)
 
     # if args.use_dpm_solver:    
     #     print(" ** replace PNDM scheduler into DPM-Solver")
