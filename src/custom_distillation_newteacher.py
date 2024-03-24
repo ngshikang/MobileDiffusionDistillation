@@ -1161,22 +1161,37 @@ def main():
                     imgs_comb = np.vstack([i.resize(min_shape) for i in imgs])
                     return imgs_comb
 
+                def image_hcollage(imgs):
+                    min_shape = sorted( [(np.sum(i.size), i.size ) for i in imgs])[0][1]
+                    imgs_comb = np.hstack([i.resize(min_shape) for i in imgs])
+                    return imgs_comb
+
+                nt_pipe = AutoPipelineForText2Image.from_pretrained(new_teacher_model, torch_dtype=torch.float16, variant=new_teacher_variant)
+                nt_pipe.scheduler = DPMSolverMultistepScheduler.from_config(nt_pipe.scheduler.config)
+                nt_pipe = nt_pipe.to("cuda")
                 # if not os.path.exists(os.path.join(val_img_dir, "teacher_0.png")):
                 if global_step < 3:
                     for kk in range(args.num_valid_images):
                         teacher_images = []
+                        nt_teacher_images = []
                         for infer_step in [1,5,10,25]:
+                            nt_infer_step = {1:1,5:2,10:3,25:4}[infer_step]
                             image = pipeline(args.valid_prompt, num_inference_steps=infer_step, generator=generator, guidance_scale=0).images[0]
+                            nt_image = nt_pipe(args.valid_prompt, num_inference_steps=nt_infer_step, generator=generator, guidance_scale=2).images[0]
                             tmp_name = os.path.join(val_img_dir, f"teacher_{kk}_{infer_step}.png")
                             image.save(tmp_name)
+                            nt_tmp_name = os.path.join(val_img_dir, f"newteacher_{kk}_{infer_step}.png")
+                            nt_image.save(nt_tmp_name)
                             teacher_images.append(image)
+                            nt_teacher_images.append(nt_image)
                         wandb_tracker.log(
                             {
                                 "teacher_validation": [
-                                    wandb.Image(image_collage(teacher_images), caption=f"{args.valid_prompt}")
+                                    wandb.Image(image_hcollage([image_collage(teacher_images), image_collage(nt_teacher_images)]), caption=f"{args.valid_prompt}")
                                 ]
                             }
                         )
+                            
 
                 # set `keep_fp32_wrapper` to True because we do not want to remove
                 # mixed precision hooks while we are still training
