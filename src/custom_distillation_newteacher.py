@@ -795,8 +795,8 @@ def main():
         # Set the training transforms
         train_dataset = dataset.with_transform(preprocess_train)
 
-    text_encoders = [text_encoder_one, text_encoder_two]
-    tokenizers = [tokenizer_one, tokenizer_two]
+    text_encoders = [nt_text_encoder_one, nt_text_encoder_two]
+    tokenizers = [nt_tokenizer_one, nt_tokenizer_two]
     compute_embeddings_fn = functools.partial(
         encode_prompt,
         text_encoders=text_encoders,
@@ -1083,8 +1083,11 @@ def main():
                 avg_loss_sd = accelerator.gather(loss_sd.repeat(args.train_batch_size)).mean()
                 train_loss_sd += avg_loss_sd.item() / args.gradient_accumulation_steps
 
-                avg_loss_kd_output = accelerator.gather(loss_kd_output.repeat(args.train_batch_size)).mean()
+                avg_loss_kd_output = accelerator.gather(loss_kd_output_original_teacher.repeat(args.train_batch_size)).mean()
                 train_loss_kd_output += avg_loss_kd_output.item() / args.gradient_accumulation_steps
+
+                avg_loss_nt_kd_output = accelerator.gather(loss_kd_output_new_teacher.repeat(args.train_batch_size)).mean()
+                train_loss_nt_kd_output += avg_loss_nt_kd_output.item() / args.gradient_accumulation_steps
 
                 avg_loss_kd_feat = accelerator.gather(loss_kd_feat.repeat(args.train_batch_size)).mean()
                 train_loss_kd_feat += avg_loss_kd_feat.item() / args.gradient_accumulation_steps
@@ -1108,6 +1111,7 @@ def main():
                         "train_loss": train_loss, 
                         "train_loss_sd": train_loss_sd,
                         "train_loss_kd_output": train_loss_kd_output,
+                        "train_loss_nt_kd_output": train_loss_nt_kd_output,
                         "train_loss_kd_feat": train_loss_kd_feat,
                         "lr": lr_scheduler.get_last_lr()[0]
                     }, 
