@@ -767,25 +767,25 @@ def main():
         crop_top_lefts = []
         for image in images:
             original_sizes.append((image.height, image.width))
-            image = train_resize(image)
-            if args.random_flip and random.random() < 0.5:
-                # flip
-                image = train_flip(image)
-            if args.center_crop:
-                y1 = max(0, int(round((image.height - args.resolution) / 2.0)))
-                x1 = max(0, int(round((image.width - args.resolution) / 2.0)))
-                image = train_crop(image)
-            else:
-                y1, x1, h, w = train_crop.get_params(image, (args.resolution, args.resolution))
-                image = crop(image, y1, x1, h, w)
-            crop_top_left = (y1, x1)
-            crop_top_lefts.append(crop_top_left)
-            image = train_transforms(image)
+            # image = train_resize(image)
+            # if args.random_flip and random.random() < 0.5:
+            #     # flip
+            #     image = train_flip(image)
+            # if args.center_crop:
+            #     y1 = max(0, int(round((image.height - args.resolution) / 2.0)))
+            #     x1 = max(0, int(round((image.width - args.resolution) / 2.0)))
+            #     image = train_crop(image)
+            # else:
+            #     y1, x1, h, w = train_crop.get_params(image, (args.resolution, args.resolution))
+            #     image = crop(image, y1, x1, h, w)
+            # crop_top_left = (y1, x1)
+            # crop_top_lefts.append(crop_top_left)
+            # image = train_transforms(image)
             all_images.append(image)
 
         examples["original_sizes"] = original_sizes
-        examples["crop_top_lefts"] = crop_top_lefts
-        examples["pixel_values"] = all_images
+        examples["crop_top_lefts"] = examples["pixel_values"]  #all_images
+        # examples["pixel_values"] = all_images
 
         return examples
 
@@ -838,7 +838,7 @@ def main():
         pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
         input_ids = torch.stack([example["input_ids"] for example in examples])
 
-        model_input = torch.stack([torch.tensor(example["model_input"]) for example in examples])
+        # model_input = torch.stack([torch.tensor(example["model_input"]) for example in examples])
         original_sizes = [example["original_sizes"] for example in examples]
         crop_top_lefts = [example["crop_top_lefts"] for example in examples]
         prompt_embeds = torch.stack([torch.tensor(example["prompt_embeds"]) for example in examples])
