@@ -2,7 +2,7 @@
 
 source activate bk-sdm
 
-MODEL_NAME="lykon/dreamshaper-8"
+MODEL_NAME="Lykon/AbsoluteReality"
 TRAIN_DATA_DIR="./data/laion_aes/preprocessed_212k" # please adjust it if needed
 UNET_CONFIG_PATH="./src/unet_config"
 
@@ -14,7 +14,7 @@ GRAD_ACCUMULATION=4
 
 StartTime=$(date +%s)
 
-CUDA_VISIBLE_DEVICES=0 accelerate launch scratch/MobileDiffusionDistillation/src/custom_distillation_newteacher.py \
+CUDA_VISIBLE_DEVICES=0 accelerate launch ./src/custom_distillation_newteacher.py \
   --pretrained_model_name_or_path $MODEL_NAME \
   --train_data_dir $TRAIN_DATA_DIR\
   --use_ema \
