@@ -1122,13 +1122,14 @@ def main():
                     with open(csv_log_path, 'a') as logfile:
                         logwriter = csv.writer(logfile, delimiter=',')
                         logwriter.writerow([epoch, step, global_step,
-                                            train_loss, train_loss_sd, train_loss_kd_output, train_loss_kd_feat,
+                                            train_loss, train_loss_sd, train_loss_kd_output,train_loss_nt_kd_output, train_loss_kd_feat,
                                             lr_scheduler.get_last_lr()[0],
                                             args.lambda_sd, args.lambda_kd_output, args.lambda_kd_feat])
 
                 train_loss = 0.0
                 train_loss_sd = 0.0
                 train_loss_kd_output = 0.0
+                train_loss_nt_kd_output = 0.0
                 train_loss_kd_feat = 0.0
 
                 if global_step % args.checkpointing_steps == 0:
@@ -1139,7 +1140,8 @@ def main():
 
             logs = {"step_loss": loss.detach().item(),
                     "sd_loss": loss_sd.detach().item(),
-                    "kd_output_loss": loss_kd_output.detach().item(),
+                    "kd_output_loss": loss_kd_output_original_teacher.detach().item(),
+                    "kd_nt_output_loss": loss_kd_output_new_teacher.detach().item(),
                     "kd_feat_loss": loss_kd_feat.detach().item(),
                     "lr": lr_scheduler.get_last_lr()[0]}
             progress_bar.set_postfix(**logs)
