@@ -789,6 +789,7 @@ def main():
 
         return examples
 
+    
     with accelerator.main_process_first():
         if args.max_train_samples is not None:
             dataset = dataset.shuffle(seed=args.seed).select(range(args.max_train_samples))
@@ -801,8 +802,8 @@ def main():
         encode_prompt,
         text_encoders=text_encoders,
         tokenizers=tokenizers,
-        proportion_empty_prompts=args.proportion_empty_prompts,
-        caption_column=args.caption_column,
+        proportion_empty_prompts=0,
+        caption_column=caption_column,
     )
     compute_vae_encodings_fn = functools.partial(compute_vae_encodings, vae=vae)
 
