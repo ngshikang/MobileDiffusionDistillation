@@ -14,7 +14,7 @@ GRAD_ACCUMULATION=4
 
 StartTime=$(date +%s)
 
-CUDA_VISIBLE_DEVICES=0 accelerate launch ./src/custom_distillation_newteacher.py \
+CUDA_VISIBLE_DEVICES=0 accelerate launch ./src/custom_distillation_newteacher_reduce_mem.py \
   --pretrained_model_name_or_path $MODEL_NAME \
   --train_data_dir $TRAIN_DATA_DIR\
   --use_ema \
@@ -31,7 +31,7 @@ CUDA_VISIBLE_DEVICES=0 accelerate launch ./src/custom_distillation_newteacher.py
   --gradient_accumulation_steps $GRAD_ACCUMULATION \
   --checkpointing_steps 5000 \
   --valid_steps 100 \
-  --lambda_sd 1.0 --lambda_kd_output 1.0 --lambda_kd_feat 1.0 \
+  --lambda_sd 1.0 --lambda_kd_output 5.0 --lambda_kd_feat 0.3 \
   --use_copy_weight_from_teacher \
   --unet_config_path $UNET_CONFIG_PATH --unet_config_name $UNET_NAME \
   --output_dir $OUTPUT_DIR \

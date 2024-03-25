@@ -565,7 +565,6 @@ def main():
     if args.use_copy_weight_from_teacher:
         copy_weight_from_teacher(unet, unet_teacher, args.unet_config_name)
    
-
     # Freeze student's vae and text_encoder and teacher's unet
     vae.requires_grad_(False)
     text_encoder.requires_grad_(False)
@@ -622,10 +621,10 @@ def main():
     if args.use_ema:
         ema_unet = UNet2DConditionModel.from_config(config_student, revision=args.revision)
         ema_unet = EMAModel(ema_unet.parameters(), model_cls=UNet2DConditionModel, model_config=ema_unet.config)
-        nt_ema_unet = UNet2DConditionModel.from_pretrained(
-            new_teacher_model, subfolder="unet", revision=new_teacher_revision, variant=new_teacher_variant
-        )
-        nt_ema_unet = EMAModel(nt_ema_unet.parameters(), model_cls=UNet2DConditionModel, model_config=nt_ema_unet.config)
+        # nt_ema_unet = UNet2DConditionModel.from_pretrained(
+        #     new_teacher_model, subfolder="unet", revision=new_teacher_revision, variant=new_teacher_variant
+        # )
+        # nt_ema_unet = EMAModel(nt_ema_unet.parameters(), model_cls=UNet2DConditionModel, model_config=nt_ema_unet.config)
 
 
     if args.enable_xformers_memory_efficient_attention:
@@ -638,7 +637,7 @@ def main():
                     "xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details."
                 )
             unet.enable_xformers_memory_efficient_attention()
-            nt_unet.enable_xformers_memory_efficient_attention()
+            # nt_unet.enable_xformers_memory_efficient_attention()
         else:
             raise ValueError("xformers is not available. Make sure it is installed correctly")
 
@@ -838,13 +837,13 @@ def main():
         pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
         input_ids = torch.stack([example["input_ids"] for example in examples])
 
-        model_input = torch.stack([torch.tensor(example["model_input"]) for example in examples])
+        # model_input = torch.stack([torch.tensor(example["model_input"]) for example in examples])
         original_sizes = [example["original_sizes"] for example in examples]
         crop_top_lefts = [example["crop_top_lefts"] for example in examples]
         prompt_embeds = torch.stack([torch.tensor(example["prompt_embeds"]) for example in examples])
         pooled_prompt_embeds = torch.stack([torch.tensor(example["pooled_prompt_embeds"]) for example in examples])
 
-        return {"pixel_values": pixel_values, "input_ids": input_ids, "model_input": model_input,
+        return {"pixel_values": pixel_values, "input_ids": input_ids, 
             "prompt_embeds": prompt_embeds,
             "pooled_prompt_embeds": pooled_prompt_embeds,
             "original_sizes": original_sizes,
