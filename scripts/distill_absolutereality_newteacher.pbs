@@ -2,8 +2,8 @@
 
 #PBS -N NewTeacherReality
 #PBS -q normal
-#PBS -l select=2:ncpus=8:mem=128G:ngpus=1
-#PBS -l walltime=12:00:00
+#PBS -l select=1:ngpus=4
+#PBS -l walltime=24:00:00
 #PBS -P Personal
 #PBS -o out-run.txt
 #PBS -e errors.txt
@@ -22,7 +22,7 @@ GRAD_ACCUMULATION=4
 
 StartTime=$(date +%s)
 
-CUDA_VISIBLE_DEVICES=0 accelerate launch scratch/MobileDiffusionDistillation/src/custom_distillation_newteacher.py \
+CUDA_VISIBLE_DEVICES=0,1,2,3 accelerate launch scratch/MobileDiffusionDistillation/src/custom_distillation_newteacher.py \
   --pretrained_model_name_or_path $MODEL_NAME \
   --train_data_dir $TRAIN_DATA_DIR\
   --use_ema \
