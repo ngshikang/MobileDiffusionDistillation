@@ -2,7 +2,7 @@
 
 #PBS -N NewTeacherReality
 #PBS -q normal
-#PBS -l select=1:ngpus=4
+#PBS -l select=1:ngpus=1
 #PBS -l walltime=24:00:00
 #PBS -P Personal
 #PBS -o out-run.txt
