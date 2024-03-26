@@ -23,7 +23,7 @@ def parse_args():
     parser.add_argument("--use_dpm_solver", action='store_false', help='use DPMSolverMultistepScheduler')
     parser.add_argument("--is_lora_checkpoint", action='store_false', help='specify whether to use LoRA finetuning')
     parser.add_argument("--lora_weight_path", type=str, default=None, help='dir path including lora.pt and lora_config.json')    
-    parser.add_argument("--unet_path", type=str, default=None, required=True, help='path to the unet model')
+    parser.add_argument("--unet_path", type=str, default=None, required=False, help='path to the unet model')
 
     args = parser.parse_args()
     return args
@@ -36,8 +36,9 @@ if __name__ == "__main__":
                                 device = args.device)
     pipeline.set_pipe_and_generator()
 
-    unet = UNet2DConditionModel.from_pretrained(args.unet_path, subfolder='unet')
-    pipeline.pipe.unet = unet.half().to(args.device)
+    if args.unet_path is not None:
+        unet = UNet2DConditionModel.from_pretrained(args.unet_path, subfolder='unet')
+        pipeline.pipe.unet = unet.half().to(args.device)
 
     if args.device == 'cpu':
         pipeline.pipe.unet = pipeline.pipe.unet.float32().to(args.device)
@@ -65,7 +66,7 @@ if __name__ == "__main__":
                                 n_steps = args.num_inference_steps,
                                 img_sz = args.img_sz)[0]
         timenow = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
-        img.save(os.path.join(save_path, f"{i}{timenow}.png"))
+        img.save(os.path.join(save_path, f"unet-{args.unet_path.split('/')[-1] if args.unet_path is not None else 'None'}_{args.num_inference_steps}steps_{(time.perf_counter()-t0):.2f}s.png"))
         img.close()
 
     pipeline.clear()
