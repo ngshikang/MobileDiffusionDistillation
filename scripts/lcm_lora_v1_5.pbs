@@ -2,8 +2,8 @@
 
 #PBS -N LcmLoraDistillation
 #PBS -q normal
-#PBS -l select=2:ncpus=8:mem=128G:ngpus=1
-#PBS -l walltime=12:00:00
+#PBS -l select=1:ncpus=8:mem=128G:ngpus=1
+#PBS -l walltime=120:00:00
 #PBS -P Personal
 #PBS -o out-run.txt
 #PBS -e errors.txt
@@ -15,14 +15,14 @@ TRAIN_DATA_DIR="scratch/MobileDiffusionDistillation/data/laion_aes/preprocessed_
 UNET_CONFIG_PATH="scratch/MobileDiffusionDistillation/src/unet_config"
 
 UNET_NAME="bk_tiny" # option: ["bk_base", "bk_small", "bk_tiny"]
-OUTPUT_DIR="scratch/MobileDiffusionDistillation/results/kd_"$UNET_NAME # please adjust it if needed
+OUTPUT_DIR="scratch/MobileDiffusionDistillation/results/"$MODEL_NAME # please adjust it if needed
 
 BATCH_SIZE=16
 GRAD_ACCUMULATION=4
 
 StartTime=$(date +%s)
 
-CUDA_VISIBLE_DEVICES=0 accelerate launch scratch/MobileDiffusionDistillation/src/lcm_custom_distillation.py \
+CUDA_VISIBLE_DEVICES=0,1,2,3 accelerate launch scratch/MobileDiffusionDistillation/src/lcm_custom_distillation.py \
   --pretrained_model_name_or_path $MODEL_NAME \
   --train_data_dir $TRAIN_DATA_DIR\
   --use_ema \
@@ -44,7 +44,8 @@ CUDA_VISIBLE_DEVICES=0 accelerate launch scratch/MobileDiffusionDistillation/src
   --unet_config_path $UNET_CONFIG_PATH --unet_config_name $UNET_NAME \
   --output_dir $OUTPUT_DIR \
   --checkpoints_total_limit 1 \
-  --valid_prompt "portrait photo of muscular bearded guy in a worn mech suit, light bokeh, intricate, steel metal, elegant, sharp focus, soft lighting, vibrant colors"
+  --valid_prompt "portrait photo of muscular bearded guy in a worn mech suit, light bokeh, intricate, steel metal, elegant, sharp focus, soft lighting, vibrant colors" \
+  --resume_from_checkpoint "latest" #"scratch/MobileDiffusionDistillation/results/kd_"$UNET_NAME"/checkpoint-8000/"
 
 
 EndTime=$(date +%s)
