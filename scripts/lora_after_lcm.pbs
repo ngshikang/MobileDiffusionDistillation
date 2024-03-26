@@ -3,7 +3,7 @@
 #PBS -N LoraAfterLcmDistillation
 #PBS -q normal
 #PBS -l select=1:ncpus=8:mem=128G:ngpus=1
-#PBS -l walltime=24:00:00
+#PBS -l walltime=120:00:00
 #PBS -P Personal
 #PBS -o out-run.txt
 #PBS -e errors.txt
@@ -22,7 +22,7 @@ GRAD_ACCUMULATION=4
 
 StartTime=$(date +%s)
 
-CUDA_VISIBLE_DEVICES=0 accelerate launch scratch/MobileDiffusionDistillation/src/lcm_custom_distillation_and_lora_after.py \
+CUDA_VISIBLE_DEVICES=0 accelerate launch scratch/MobileDiffusionDistillation/src/lcm_custom_distillation.py \
   --pretrained_model_name_or_path $MODEL_NAME \
   --train_data_dir $TRAIN_DATA_DIR\
   --use_ema \
@@ -44,8 +44,8 @@ CUDA_VISIBLE_DEVICES=0 accelerate launch scratch/MobileDiffusionDistillation/src
   --unet_config_path $UNET_CONFIG_PATH --unet_config_name $UNET_NAME \
   --output_dir $OUTPUT_DIR \
   --checkpoints_total_limit 1 \
-  --valid_prompt "portrait photo of muscular bearded guy in a worn mech suit, light bokeh, intricate, steel metal, elegant, sharp focus, soft lighting, vibrant colors"
-  --resume_from_checkpoint "scratch/MobileDiffusionDistillation/results/kd_"$UNET_NAME"/checkpoint-8000/"
+  --valid_prompt "portrait photo of muscular bearded guy in a worn mech suit, light bokeh, intricate, steel metal, elegant, sharp focus, soft lighting, vibrant colors" \
+  --resume_from_checkpoint "latest" #"scratch/MobileDiffusionDistillation/results/kd_"$UNET_NAME"/checkpoint-8000/"
 
 EndTime=$(date +%s)
 echo "** KD training takes $(($EndTime - $StartTime)) seconds."
