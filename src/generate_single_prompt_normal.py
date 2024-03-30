@@ -41,8 +41,7 @@ if __name__ == "__main__":
         pipeline.pipe.unet = unet.half().to(args.device)
 
     if args.device == 'cpu':
-        pipeline.pipe.unet = pipeline.pipe.unet.float32().to(args.device)
-        pipeline.pipe.text_encoder = pipeline.pipe.text_encoder.float32().to(args.device)
+        pipeline.pipe = pipeline.pipe.to(device = args.device, dtype=torch.float32)
 
     # if args.use_dpm_solver:    
     #     print(" ** replace PNDM scheduler into DPM-Solver")
@@ -56,7 +55,7 @@ if __name__ == "__main__":
     #                            config_path=os.path.join(args.lora_weight_path, 'lora_config.json'),
     #                            dtype=torch.float16)
         
-    save_path = os.path.join(args.save_dir, args.val_prompt)
+    save_path = os.path.join(args.save_dir, args.val_prompt[:50])
     os.makedirs(save_path, exist_ok=True)
 
     t0 = time.perf_counter()
@@ -65,7 +64,6 @@ if __name__ == "__main__":
         img = pipeline.generate(prompt = args.val_prompt,
                                 n_steps = args.num_inference_steps,
                                 img_sz = args.img_sz)[0]
-        timenow = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
         img.save(os.path.join(save_path, f"unet-{args.unet_path.split('/')[-1] if args.unet_path is not None else 'None'}_{args.num_inference_steps}steps_{(time.perf_counter()-t0):.2f}s.png"))
         img.close()
 
