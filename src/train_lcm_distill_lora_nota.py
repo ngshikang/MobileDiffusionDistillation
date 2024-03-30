@@ -37,6 +37,7 @@ import webdataset as wds
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import ProjectConfiguration, set_seed
+from datasets import load_dataset
 from braceexpand import braceexpand
 from huggingface_hub import create_repo, upload_folder
 from packaging import version
@@ -155,86 +156,6 @@ class WebdatasetFilter:
                 return False
         except Exception:
             return False
-
-
-class SDText2ImageDataset:
-    def __init__(
-        self,
-        train_shards_path_or_url: Union[str, List[str]],
-        num_train_examples: int,
-        per_gpu_batch_size: int,
-        global_batch_size: int,
-        num_workers: int,
-        resolution: int = 512,
-        interpolation_type: str = "bilinear",
-        shuffle_buffer_size: int = 1000,
-        pin_memory: bool = False,
-        persistent_workers: bool = False,
-    ):
-        if not isinstance(train_shards_path_or_url, str):
-            train_shards_path_or_url = [list(braceexpand(urls)) for urls in train_shards_path_or_url]
-            # flatten list using itertools
-            train_shards_path_or_url = list(itertools.chain.from_iterable(train_shards_path_or_url))
-
-        interpolation_mode = resolve_interpolation_mode(interpolation_type)
-
-        def transform(example):
-            # resize image
-            image = example["image"]
-            image = TF.resize(image, resolution, interpolation=interpolation_mode)
-
-            # get crop coordinates and crop image
-            c_top, c_left, _, _ = transforms.RandomCrop.get_params(image, output_size=(resolution, resolution))
-            image = TF.crop(image, c_top, c_left, resolution, resolution)
-            image = TF.to_tensor(image)
-            image = TF.normalize(image, [0.5], [0.5])
-
-            example["image"] = image
-            return example
-
-        processing_pipeline = [
-            wds.decode("pil", handler=wds.ignore_and_continue),
-            wds.rename(image="jpg;png;jpeg;webp", text="text;txt;caption", handler=wds.warn_and_continue),
-            wds.map(filter_keys({"image", "text"})),
-            wds.map(transform),
-            wds.to_tuple("image", "text"),
-        ]
-
-        # Create train dataset and loader
-        pipeline = [
-            wds.ResampledShards(train_shards_path_or_url),
-            tarfile_to_samples_nothrow,
-            wds.shuffle(shuffle_buffer_size),
-            *processing_pipeline,
-            wds.batched(per_gpu_batch_size, partial=False, collation_fn=default_collate),
-        ]
-
-        num_worker_batches = math.ceil(num_train_examples / (global_batch_size * num_workers))  # per dataloader worker
-        num_batches = num_worker_batches * num_workers
-        num_samples = num_batches * global_batch_size
-
-        # each worker is iterating over this
-        self._train_dataset = wds.DataPipeline(*pipeline).with_epoch(num_worker_batches)
-        self._train_dataloader = wds.WebLoader(
-            self._train_dataset,
-            batch_size=None,
-            shuffle=False,
-            num_workers=num_workers,
-            pin_memory=pin_memory,
-            persistent_workers=persistent_workers,
-        )
-        # add meta-data to dataloader instance for convenience
-        self._train_dataloader.num_batches = num_batches
-        self._train_dataloader.num_samples = num_samples
-
-    @property
-    def train_dataset(self):
-        return self._train_dataset
-
-    @property
-    def train_dataloader(self):
-        return self._train_dataloader
-
 
 def log_validation(vae, unet, args, accelerator, weight_dtype, step):
     logger.info("Running validation... ")
@@ -956,7 +877,7 @@ def main(args):
     # teacher_unet = UNet2DConditionModel.from_pretrained(
     #     args.pretrained_teacher_model, subfolder="unet", revision=args.teacher_revision
     # )
-    # // todo: change to from_pretrained nota distilled model
+    # //todo: change to from_pretrained nota distilled model
     config_student = UNet2DConditionModel.load_config(args.unet_config_path, subfolder=args.unet_config_name)
     teacher_unet = UNet2DConditionModel.from_config(config_student, revision=args.non_ema_revision)
 
@@ -969,7 +890,7 @@ def main(args):
     # unet = UNet2DConditionModel.from_pretrained(
     #     args.pretrained_teacher_model, subfolder="unet", revision=args.teacher_revision
     # )
-    # // todo: change to from_pretrained nota distilled model
+    # //todo: change to from_pretrained nota distilled model
     unet = UNet2DConditionModel.from_config(config_student, revision=args.non_ema_revision)
     unet.train()
 
@@ -1117,29 +1038,78 @@ def main(args):
     # 13. Dataset creation and data processing
     # Here, we compute not just the text embeddings but also the additional embeddings
     # needed for the SD XL UNet to operate.
-    def compute_embeddings(prompt_batch, proportion_empty_prompts, text_encoder, tokenizer, is_train=True):
-        prompt_embeds = encode_prompt(prompt_batch, text_encoder, tokenizer, proportion_empty_prompts, is_train)
-        return {"prompt_embeds": prompt_embeds}
+    # def compute_embeddings(prompt_batch, proportion_empty_prompts, text_encoder, tokenizer, is_train=True):
+    #     prompt_embeds = encode_prompt(prompt_batch, text_encoder, tokenizer, proportion_empty_prompts, is_train)
+    #     return {"prompt_embeds": prompt_embeds}
+    
+    # compute_embeddings_fn = functools.partial(
+    #     compute_embeddings,
+    #     proportion_empty_prompts=0,
+    #     text_encoder=text_encoder,
+    #     tokenizer=tokenizer,
+    # )
+    
+    # Get the datasets. As the amount of data grows, the time taken by load_dataset also increases.
+    print("*** load dataset: start")
+    t0 = time.time()
+    dataset = load_dataset("imagefolder", data_dir=args.train_data_dir, split="train")
+    print(f"*** load dataset: end --- {time.time()-t0} sec")
+    
+    # Preprocessing the datasets.
+    # We need to tokenize input captions and transform the images.
+    def tokenize_captions(examples, is_train=True):
+        captions = []
+        for caption in examples[caption_column]:
+            if isinstance(caption, str):
+                captions.append(caption)
+            elif isinstance(caption, (list, np.ndarray)):
+                # take a random caption if there are multiple
+                captions.append(random.choice(caption) if is_train else caption[0])
+            else:
+                raise ValueError(
+                    f"Caption column `{caption_column}` should contain either strings or lists of strings."
+                )
+        inputs = tokenizer(
+            captions, max_length=tokenizer.model_max_length, padding="max_length", truncation=True, return_tensors="pt"
+        )
+        return inputs.input_ids
 
-    dataset = SDText2ImageDataset(
-        train_shards_path_or_url=args.train_shards_path_or_url,
-        num_train_examples=args.max_train_samples,
-        per_gpu_batch_size=args.train_batch_size,
-        global_batch_size=args.train_batch_size * accelerator.num_processes,
-        num_workers=args.dataloader_num_workers,
-        resolution=args.resolution,
-        interpolation_type=args.interpolation_type,
-        shuffle_buffer_size=1000,
-        pin_memory=True,
-        persistent_workers=True,
+    # Preprocessing the datasets.
+    train_transforms = transforms.Compose(
+        [
+            transforms.Resize(args.resolution, interpolation=transforms.InterpolationMode.BILINEAR),
+            transforms.CenterCrop(args.resolution) if args.center_crop else transforms.RandomCrop(args.resolution),
+            transforms.RandomHorizontalFlip() if args.random_flip else transforms.Lambda(lambda x: x),
+            transforms.ToTensor(),
+            transforms.Normalize([0.5], [0.5]),
+        ]
     )
-    train_dataloader = dataset.train_dataloader
 
-    compute_embeddings_fn = functools.partial(
-        compute_embeddings,
-        proportion_empty_prompts=0,
-        text_encoder=text_encoder,
-        tokenizer=tokenizer,
+    def preprocess_train(examples):
+        images = [image.convert("RGB") for image in examples[image_column]]
+        examples["pixel_values"] = [train_transforms(image) for image in images]
+        examples["input_ids"] = tokenize_captions(examples)
+        return examples
+
+    with accelerator.main_process_first():
+        if args.max_train_samples is not None:
+            dataset = dataset.shuffle(seed=args.seed).select(range(args.max_train_samples))
+        # Set the training transforms
+        train_dataset = dataset.with_transform(preprocess_train)
+
+    def collate_fn(examples):
+        pixel_values = torch.stack([example["pixel_values"] for example in examples])
+        pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
+        input_ids = torch.stack([example["input_ids"] for example in examples])
+        return {"pixel_values": pixel_values, "input_ids": input_ids}
+
+    # DataLoaders creation:
+    train_dataloader = torch.utils.data.DataLoader(
+        train_dataset,
+        shuffle=True,
+        collate_fn=collate_fn,
+        batch_size=args.train_batch_size,
+        num_workers=args.dataloader_num_workers,
     )
 
     # 14. LR Scheduler creation
@@ -1234,18 +1204,19 @@ def main(args):
                 image, text = batch
 
                 image = image.to(accelerator.device, non_blocking=True)
-                encoded_text = compute_embeddings_fn(text)
+                # encoded_text = compute_embeddings_fn(text)
+                encoded_text = {"prompt_embeds": text_encoder(batch["input_ids"])[0]}
 
                 pixel_values = image.to(dtype=weight_dtype)
                 if vae.dtype != weight_dtype:
                     vae.to(dtype=weight_dtype)
 
                 # encode pixel values with batch size of at most args.vae_encode_batch_size
-                latents = []
-                for i in range(0, pixel_values.shape[0], args.vae_encode_batch_size):
-                    latents.append(vae.encode(pixel_values[i : i + args.vae_encode_batch_size]).latent_dist.sample())
-                latents = torch.cat(latents, dim=0)
-
+                # latents = []
+                # for i in range(0, pixel_values.shape[0], args.vae_encode_batch_size):
+                #     latents.append(vae.encode(pixel_values[i : i + args.vae_encode_batch_size]).latent_dist.sample())
+                # latents = torch.cat(latents, dim=0)
+                latents = vae.encode(batch["pixel_values"].to(weight_dtype)).latent_dist.sample()
                 latents = latents * vae.config.scaling_factor
                 latents = latents.to(weight_dtype)
                 bsz = latents.shape[0]
@@ -1288,7 +1259,7 @@ def main(args):
                     start_timesteps,
                     timestep_cond=None,
                     encoder_hidden_states=prompt_embeds.float(),
-                    added_cond_kwargs=encoded_text,
+                    # added_cond_kwargs={"prompt_embeds": encoded_text}, //note: popped before, the dict is empty now
                 ).sample
 
                 pred_x_0 = get_predicted_original_sample(
