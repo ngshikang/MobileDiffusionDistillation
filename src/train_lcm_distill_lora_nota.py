@@ -715,32 +715,6 @@ def parse_args():
     return args
 
 
-# Adapted from pipelines.StableDiffusionPipeline.encode_prompt
-def encode_prompt(prompt_batch, text_encoder, tokenizer, proportion_empty_prompts, is_train=True):
-    captions = []
-    for caption in prompt_batch:
-        if random.random() < proportion_empty_prompts:
-            captions.append("")
-        elif isinstance(caption, str):
-            captions.append(caption)
-        elif isinstance(caption, (list, np.ndarray)):
-            # take a random caption if there are multiple
-            captions.append(random.choice(caption) if is_train else caption[0])
-
-    with torch.no_grad():
-        text_inputs = tokenizer(
-            captions,
-            padding="max_length",
-            max_length=tokenizer.model_max_length,
-            truncation=True,
-            return_tensors="pt",
-        )
-        text_input_ids = text_inputs.input_ids
-        prompt_embeds = text_encoder(text_input_ids.to(text_encoder.device))[0]
-
-    return prompt_embeds
-
-
 def main(args):
     if args.report_to == "wandb" and args.hub_token is not None:
         raise ValueError(
@@ -991,17 +965,7 @@ def main(args):
     # 13. Dataset creation and data processing
     # Here, we compute not just the text embeddings but also the additional embeddings
     # needed for the SD XL UNet to operate.
-    # def compute_embeddings(prompt_batch, proportion_empty_prompts, text_encoder, tokenizer, is_train=True):
-    #     prompt_embeds = encode_prompt(prompt_batch, text_encoder, tokenizer, proportion_empty_prompts, is_train)
-    #     return {"prompt_embeds": prompt_embeds}
-    
-    # compute_embeddings_fn = functools.partial(
-    #     compute_embeddings,
-    #     proportion_empty_prompts=0,
-    #     text_encoder=text_encoder,
-    #     tokenizer=tokenizer,
-    # )
-    
+
     # Get the datasets. As the amount of data grows, the time taken by load_dataset also increases.
     print("*** load dataset: start")
     t0 = time.time()
@@ -1067,6 +1031,7 @@ def main(args):
         collate_fn=collate_fn,
         batch_size=args.train_batch_size,
         num_workers=args.dataloader_num_workers,
+        drop_last=True,
     )
 
     # 14. LR Scheduler creation
