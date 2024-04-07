@@ -21,6 +21,7 @@ import json
 import logging
 import math
 import os
+import time
 import random
 import shutil
 from pathlib import Path
@@ -33,12 +34,12 @@ import torch.nn.functional as F
 import torch.utils.checkpoint
 import torchvision.transforms.functional as TF
 import transformers
-import webdataset as wds
+# import webdataset as wds
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import ProjectConfiguration, set_seed
 from datasets import load_dataset
-from braceexpand import braceexpand
+# from braceexpand import braceexpand
 from huggingface_hub import create_repo, upload_folder
 from packaging import version
 from peft import LoraConfig, get_peft_model, get_peft_model_state_dict
@@ -46,12 +47,12 @@ from torch.utils.data import default_collate
 from torchvision import transforms
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer, CLIPTextModel, PretrainedConfig
-from webdataset.tariterators import (
-    base_plus_ext,
-    tar_file_expander,
-    url_opener,
-    valid_sample,
-)
+# from webdataset.tariterators import (
+#     base_plus_ext,
+#     tar_file_expander,
+#     url_opener,
+#     valid_sample,
+# )
 
 import diffusers
 from diffusers import (
@@ -94,68 +95,6 @@ def get_module_kohya_state_dict(module, prefix: str, dtype: torch.dtype, adapter
 
     return kohya_ss_state_dict
 
-
-def filter_keys(key_set):
-    def _f(dictionary):
-        return {k: v for k, v in dictionary.items() if k in key_set}
-
-    return _f
-
-
-def group_by_keys_nothrow(data, keys=base_plus_ext, lcase=True, suffixes=None, handler=None):
-    """Return function over iterator that groups key, value pairs into samples.
-
-    :param keys: function that splits the key into key and extension (base_plus_ext) :param lcase: convert suffixes to
-    lower case (Default value = True)
-    """
-    current_sample = None
-    for filesample in data:
-        assert isinstance(filesample, dict)
-        fname, value = filesample["fname"], filesample["data"]
-        prefix, suffix = keys(fname)
-        if prefix is None:
-            continue
-        if lcase:
-            suffix = suffix.lower()
-        # FIXME webdataset version throws if suffix in current_sample, but we have a potential for
-        #  this happening in the current LAION400m dataset if a tar ends with same prefix as the next
-        #  begins, rare, but can happen since prefix aren't unique across tar files in that dataset
-        if current_sample is None or prefix != current_sample["__key__"] or suffix in current_sample:
-            if valid_sample(current_sample):
-                yield current_sample
-            current_sample = {"__key__": prefix, "__url__": filesample["__url__"]}
-        if suffixes is None or suffix in suffixes:
-            current_sample[suffix] = value
-    if valid_sample(current_sample):
-        yield current_sample
-
-
-def tarfile_to_samples_nothrow(src, handler=wds.warn_and_continue):
-    # NOTE this is a re-impl of the webdataset impl with group_by_keys that doesn't throw
-    streams = url_opener(src, handler=handler)
-    files = tar_file_expander(streams, handler=handler)
-    samples = group_by_keys_nothrow(files, handler=handler)
-    return samples
-
-
-class WebdatasetFilter:
-    def __init__(self, min_size=1024, max_pwatermark=0.5):
-        self.min_size = min_size
-        self.max_pwatermark = max_pwatermark
-
-    def __call__(self, x):
-        try:
-            if "json" in x:
-                x_json = json.loads(x["json"])
-                filter_size = (x_json.get("original_width", 0.0) or 0.0) >= self.min_size and x_json.get(
-                    "original_height", 0
-                ) >= self.min_size
-                filter_watermark = (x_json.get("pwatermark", 1.0) or 1.0) <= self.max_pwatermark
-                return filter_size and filter_watermark
-            else:
-                return False
-        except Exception:
-            return False
 
 def log_validation(vae, unet, args, accelerator, weight_dtype, step):
     logger.info("Running validation... ")
@@ -419,6 +358,9 @@ def parse_args():
         required=False,
         help="Revision of pretrained LDM model identifier from huggingface.co/models.",
     )
+    # ---------- BK UNet Arguments -------
+    parser.add_argument("--unet_config_path", type=str, default="./src/unet_config")     
+    parser.add_argument("--unet_config_name", type=str, default="bk_small", choices=["bk_base", "bk_small", "bk_tiny"])   
     # ----------Training Arguments----------
     # ----General Training Arguments----
     parser.add_argument(
@@ -528,6 +470,16 @@ def parse_args():
         default=0,
         help=(
             "Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."
+        ),
+    )
+    parser.add_argument(
+        "--train_data_dir",
+        type=str,
+        default=None,
+        help=(
+            "A folder containing the training data. Folder contents must follow the structure described in"
+            " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file"
+            " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."
         ),
     )
     # ----Batch Size and Training Steps----
@@ -874,12 +826,13 @@ def main(args):
 
     # 5. Load distilled nota student U-Net as teacher U-Net from checkpoint
     # 5. Load teacher U-Net from SD 1.X/2.X checkpoint
-    # teacher_unet = UNet2DConditionModel.from_pretrained(
-    #     args.pretrained_teacher_model, subfolder="unet", revision=args.teacher_revision
-    # )
     # //todo: change to from_pretrained nota distilled model
-    config_student = UNet2DConditionModel.load_config(args.unet_config_path, subfolder=args.unet_config_name)
-    teacher_unet = UNet2DConditionModel.from_config(config_student, revision=args.non_ema_revision)
+    # config_student = UNet2DConditionModel.load_config(args.unet_config_path, subfolder=args.unet_config_name)
+    # teacher_unet = UNet2DConditionModel.from_config(config_student, revision=args.non_ema_revision)
+
+    teacher_unet = UNet2DConditionModel.from_pretrained(
+        args.pretrained_teacher_model, subfolder="unet", revision=args.teacher_revision
+    )
 
     # 6. Freeze teacher vae, text_encoder, and teacher_unet
     vae.requires_grad_(False)
@@ -887,11 +840,11 @@ def main(args):
     teacher_unet.requires_grad_(False)
 
     # 7. Create online student U-Net.
-    # unet = UNet2DConditionModel.from_pretrained(
-    #     args.pretrained_teacher_model, subfolder="unet", revision=args.teacher_revision
-    # )
+    unet = UNet2DConditionModel.from_pretrained(
+        args.pretrained_teacher_model, subfolder="unet", revision=args.teacher_revision
+    )
     # //todo: change to from_pretrained nota distilled model
-    unet = UNet2DConditionModel.from_config(config_student, revision=args.non_ema_revision)
+    # unet = UNet2DConditionModel.from_config(config_student, revision=args.non_ema_revision)
     unet.train()
 
     # Check that all trainable models are in full precision
@@ -1056,6 +1009,10 @@ def main(args):
     print(f"*** load dataset: end --- {time.time()-t0} sec")
     
     # Preprocessing the datasets.
+    column_names = dataset.column_names
+    image_column = column_names[0]
+    caption_column = column_names[1]
+
     # We need to tokenize input captions and transform the images.
     def tokenize_captions(examples, is_train=True):
         captions = []
@@ -1115,7 +1072,7 @@ def main(args):
     # 14. LR Scheduler creation
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
-    num_update_steps_per_epoch = math.ceil(train_dataloader.num_batches / args.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math.ceil(train_dataloader.batch_size / args.gradient_accumulation_steps)
     if args.max_train_steps is None:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
@@ -1129,10 +1086,10 @@ def main(args):
 
     # 15. Prepare for training
     # Prepare everything with our `accelerator`.
-    unet, optimizer, lr_scheduler = accelerator.prepare(unet, optimizer, lr_scheduler)
+    unet, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(unet, optimizer, train_dataloader, lr_scheduler)
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    num_update_steps_per_epoch = math.ceil(train_dataloader.num_batches / args.gradient_accumulation_steps)
+    # num_update_steps_per_epoch = math.ceil(train_dataloader.batch_size / args.gradient_accumulation_steps)
     if overrode_max_train_steps:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
     # Afterwards we recalculate our number of training epochs
@@ -1153,7 +1110,7 @@ def main(args):
     total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
 
     logger.info("***** Running training *****")
-    logger.info(f"  Num batches each epoch = {train_dataloader.num_batches}")
+    logger.info(f"  Num batches each epoch = {train_dataloader.batch_size}")
     logger.info(f"  Num Epochs = {args.num_train_epochs}")
     logger.info(f"  Instantaneous batch size per device = {args.train_batch_size}")
     logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
@@ -1201,13 +1158,13 @@ def main(args):
         for step, batch in enumerate(train_dataloader):
             with accelerator.accumulate(unet):
                 # 1. Load and process the image and text conditioning
-                image, text = batch
+                # image, text = batch
 
-                image = image.to(accelerator.device, non_blocking=True)
+                # image = image.to(accelerator.device, non_blocking=True)
                 # encoded_text = compute_embeddings_fn(text)
                 encoded_text = {"prompt_embeds": text_encoder(batch["input_ids"])[0]}
 
-                pixel_values = image.to(dtype=weight_dtype)
+                # pixel_values = image.to(dtype=weight_dtype)
                 if vae.dtype != weight_dtype:
                     vae.to(dtype=weight_dtype)
 
@@ -1361,6 +1318,7 @@ def main(args):
                     loss = torch.mean(
                         torch.sqrt((model_pred.float() - target.float()) ** 2 + args.huber_c**2) - args.huber_c
                     )
+                # loss = args.lambda_sd * loss_sd + args.lambda_kd_output * loss_kd_output + args.lambda_kd_feat * loss_kd_feat
 
                 # 11. Backpropagate on the online student model (`unet`)
                 accelerator.backward(loss)

@@ -1,0 +1,54 @@
+#!/bin/bash
+
+#PBS -N LCMTrain
+#PBS -q normal
+#PBS -l select=1:mem=64G:ngpus=1
+#PBS -l walltime=12:00:00
+#PBS -P Personal
+#PBS -o out-run.txt
+#PBS -e errors.txt
+
+source activate nota
+
+# MODEL_NAME="CompVis/stable-diffusion-v1-4"
+MODEL_NAME="nota-ai/bk-sdm-tiny-2m"
+TRAIN_DATA_DIR="scratch/nota/MobileDiffusionDistillation/data/laion_aes/preprocessed_11k" # please adjust it if needed
+# TRAIN_DATA_DIR="data/laion_aes/preprocessed_212k"
+UNET_CONFIG_PATH="scratch/nota/MobileDiffusionDistillation/src/unet_config"
+
+UNET_NAME="bk_tiny" # option: ["bk_base", "bk_small", "bk_tiny"]
+OUTPUT_DIR="scratch/nota/MobileDiffusionDistillation/results/lcm_"$UNET_NAME # please adjust it if needed
+TEACHER_MODEL_DIR="scratch/nota/MobileDiffusionDistillation/results/toy_"$UNET_NAME # please adjust it if needed
+
+
+BATCH_SIZE=8
+GRAD_ACCUMULATION=8
+
+StartTime=$(date +%s)
+
+CUDA_VISIBLE_DEVICES=0 accelerate launch /home/users/nus/e1216290/scratch/nota/MobileDiffusionDistillation/src/train_lcm_distill_lora_nota.py \
+  --pretrained_teacher_model $MODEL_NAME \
+  --train_data_dir $TRAIN_DATA_DIR\
+  --resolution 512 --center_crop --random_flip \
+  --train_batch_size $BATCH_SIZE \
+  --gradient_checkpointing \
+  --mixed_precision="bf16" \
+  --learning_rate 5e-05 \
+  --max_grad_norm 1 \
+  --lr_scheduler="constant" --lr_warmup_steps=0 \
+  --report_to="wandb" \
+  --max_train_steps=1000000 \
+  --seed 1234 \
+  --gradient_accumulation_steps $GRAD_ACCUMULATION \
+  --checkpointing_steps 5000 \
+  --validation_steps 50 \
+  --output_dir $OUTPUT_DIR
+  # --unet_config_path $UNET_CONFIG_PATH --unet_config_name $UNET_NAME \
+  # --lambda_sd 1.0 --lambda_kd_output 1.0 --lambda_kd_feat 1.0 \
+  # --use_ema \
+  # --use_copy_weight_from_teacher \
+
+
+EndTime=$(date +%s)
+echo "** KD training takes $(($EndTime - $StartTime)) seconds."
+
