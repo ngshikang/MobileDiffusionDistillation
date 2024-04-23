@@ -11,7 +11,7 @@ from utils.inference_pipeline import InferencePipeline, load_and_set_lora_ckpt
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_id", type=str, default="nota-ai/bk-sdm-small")    
-    parser.add_argument("--save_dir", type=str, default="./results/bk-sdm-small")
+    parser.add_argument("--save_dir", type=str, default="./inference_results/bk-sdm-small")
     parser.add_argument("--num_images", type=int, default=1)
     parser.add_argument("--num_inference_steps", type=int, default=25)
     parser.add_argument('--device', type=str, default='cuda:0', help='Device to use, cuda:gpu_number or cpu')
