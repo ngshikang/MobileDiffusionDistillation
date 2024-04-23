@@ -169,4 +169,8 @@ cython_debug/
 /results
 /data
 /wandb
+/coreml_models*
+/coreml*
+/onnx*
+/darling
 /inference_results
