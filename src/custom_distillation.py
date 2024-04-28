@@ -1,8 +1,8 @@
+#!/usr/bin/env python
 # ------------------------------------------------------------------------------------
-# Copyright 2023. Nota Inc. All Rights Reserved.
+# Code modified from Nota AI
 # Code modified from https://github.com/huggingface/diffusers/blob/v0.15.0/examples/text_to_image/train_text_to_image.py
 # ------------------------------------------------------------------------------------
-#!/usr/bin/env python
 # coding=utf-8
 # Copyright 2023 The HuggingFace Inc. team. All rights reserved.
 #
