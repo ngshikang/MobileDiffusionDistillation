@@ -38,4 +38,4 @@ This project, along with its weights, is subject to the [CreativeML Open RAIL-M 
 ## Acknowledgments
 - [National Supercomputing Centre (NSCC) Singapore](https://www.nscc.sg/) for their GPU resources.
 - [CompVis](https://github.com/CompVis/latent-diffusion), [Runway](https://runwayml.com/), [CivitAI, Lykon](https://civitai.com/user/Lykon) and [Stability AI](https://stability.ai/) for the Stable Diffusion models.
-- [LAION](https://laion.ai/), [Diffusers](https://github.com/huggingface/diffusers), [PEFT](https://github.com/huggingface/peft), and [Core ML Stable Diffusion](https://github.com/apple/ml-stable-diffusion), [Nota AI](https://github.com/Nota-NetsPresso/BK-SDM) for their contributions.
+- [LAION](https://laion.ai/), [Diffusers](https://github.com/huggingface/diffusers), [PEFT](https://github.com/huggingface/peft), [Core ML Stable Diffusion](https://github.com/apple/ml-stable-diffusion), and [Nota AI](https://github.com/Nota-NetsPresso/BK-SDM) for their contributions.
