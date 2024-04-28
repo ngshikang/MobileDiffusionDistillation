@@ -8,7 +8,7 @@
 #PBS -o out-run.txt
 #PBS -e errors.txt
 
-source activate distillation
+source activate mdd
 
 MODEL_NAME="Lykon/AbsoluteReality"
 TRAIN_DATA_DIR="scratch/MobileDiffusionDistillation/data/laion_aes/preprocessed_212k" # please adjust it if needed
