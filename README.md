@@ -13,7 +13,7 @@ pip install -r requirements.txt
 You may refer to [Nota AI's repo for a preprocessed dataset of LAION](https://github.com/Nota-NetsPresso/BK-SDM?tab=readme-ov-file#single-gpu-training-for-bk-sdm-base-small-tiny), or use your own dataset of image-text pairs.
 
 ## Training
-Login to NSCC and submit the job using the following command.
+Login to NSCC and adjust the local environment to avoid running out of memory locally.
 ```
 export HF_HOME="/scratch/.cache/huggingface"
 export HF_DATASETS_CACHE="/scratch/.cache/huggingface/datasets"
