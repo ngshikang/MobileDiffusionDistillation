@@ -174,3 +174,5 @@ cython_debug/
 /onnx*
 /darling
 /inference_results
+*.txt
+/HPSv2
